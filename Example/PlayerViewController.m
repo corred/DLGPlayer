@@ -51,23 +51,24 @@ typedef enum : NSUInteger {
     self.status = DLGPlayerStatusNone;
     self.nextOperation = DLGPlayerOperationNone;
     
+    [self registerNotification];
+    
     nowPlayingInfo = [NSMutableDictionary dictionary];
     [self commandCenterInit];
     
     [self actionsMenuButtonsOrder];
 }
 
-- (void)viewWillAppear:(BOOL)animated
-{
-    [super viewWillAppear:animated];
-    [self registerNotification];
-}
-
-- (void)viewWillDisappear:(BOOL)animated
-{
-    [super viewWillDisappear:animated];
-    [self unregisterNotification];
-}
+//- (void)viewWillAppear:(BOOL)animated
+//{
+//    [super viewWillAppear:animated];
+//}
+//
+//- (void)viewWillDisappear:(BOOL)animated
+//{
+//    [super viewWillDisappear:animated];
+//    [self unregisterNotification];
+//}
 
 - (void)viewDidAppear:(BOOL)animated
 {
