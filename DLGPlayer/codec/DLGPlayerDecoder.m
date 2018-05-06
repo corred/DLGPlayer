@@ -15,8 +15,6 @@
 #import "DLGPlayerVideoYUVFrame.h"
 #import <libavformat/avformat.h>
 #import <libavutil/imgutils.h>
-#import <libavutil/display.h>
-#import <libavutil/eval.h>
 #import <libswscale/swscale.h>
 #import <libswresample/swresample.h>
 #import <Accelerate/Accelerate.h>
@@ -57,12 +55,24 @@ static int interruptCallback(void *context) {
 
 @implementation DLGPlayerDecoder
 
+- (id)init {
+    self = [super init];
+    if (self) {
+        av_register_all();
+    }
+    return self;
+}
+
 - (void)dealloc {
     NSLog(@"DLGPlayerDecoder dealloc");
 }
 
-- (BOOL)open:(NSString *)url error:(NSError **)error {
-    if (url == nil || url.length == 0) {
+- (BOOL)open:(NSString *)url error:(NSError **)error
+{
+    g_dIOStartTime = [NSDate timeIntervalSinceReferenceDate];
+    g_bPrepareClose = FALSE;
+    
+    if (!url || url.length == 0) {
         [DLGPlayerUtils createError:error
                          withDomain:DLGPlayerErrorDomainDecoder
                             andCode:DLGPlayerErrorCodeInvalidURL
@@ -75,13 +85,18 @@ static int interruptCallback(void *context) {
     
     // 2. Open Input
     AVFormatContext *fmtctx = NULL;
+    fmtctx = avformat_alloc_context(); //!!!
+    AVIOInterruptCB icb = {interruptCallback, NULL};
+    fmtctx->interrupt_callback = icb;
+    
     int ret = avformat_open_input(&fmtctx, [url UTF8String], NULL, NULL);
     if (ret != 0) {
         if (fmtctx != NULL) avformat_free_context(fmtctx);
-        [DLGPlayerUtils createError:error
+        if (!g_bPrepareClose) {
+            [DLGPlayerUtils createError:error
                          withDomain:DLGPlayerErrorDomainDecoder
                             andCode:DLGPlayerErrorCodeCannotOpenInput
-                         andMessage:[DLGPlayerUtils localizedString:@"DLG_PLAYER_STRINGS_CANNOT_OPEN_INPUT"]];
+                         andMessage:[DLGPlayerUtils localizedString:@"DLG_PLAYER_STRINGS_CANNOT_OPEN_INPUT"]];}
         return NO;
     }
     
@@ -106,7 +121,6 @@ static int interruptCallback(void *context) {
     AVCodecContext *vcodectx = NULL;
     struct SwsContext *swsctx = NULL;
     BOOL isYUV = NO;
-    double rotation = 0;
     int picstream = -1;
     int vstream = [self findVideoStream:fmtctx context:&vcodectx pictureStream:&picstream];
     if (vstream >= 0 && vcodectx != NULL) {
@@ -121,7 +135,6 @@ static int interruptCallback(void *context) {
                                         SWS_BILINEAR, NULL, NULL, NULL);
             }
             [DLGPlayerDecoder stream:fmtctx->streams[vstream] fps:&_videoFPS timebase:&_videoTimebase default:0.04];
-            rotation = [DLGPlayerDecoder rotationFromVideoStream:fmtctx->streams[vstream]];
         }
         
         BOOL swsError = isYUV ? NO : (swsctx == NULL || vswsframe == NULL);
@@ -199,14 +212,9 @@ static int interruptCallback(void *context) {
     self.hasPicture = picstream >= 0;
     self.isEOF = NO;
     
-    self.rotation = rotation;
     int64_t duration = fmtctx->duration;
     self.duration = (duration == AV_NOPTS_VALUE ? -1 : ((double)duration / AV_TIME_BASE));
     self.metadata = [self findMetadata:fmtctx];
-    
-    g_bPrepareClose = FALSE;
-    AVIOInterruptCB icb = {interruptCallback, NULL};
-    fmtctx->interrupt_callback = icb;
     
     return YES;
 }
@@ -219,6 +227,24 @@ static int interruptCallback(void *context) {
     AVDictionaryEntry *entry = av_dict_get(metadata, "", NULL, AV_DICT_IGNORE_SUFFIX);
     while (entry != NULL) {
         NSString *key = [NSString stringWithCString:entry->key encoding:NSUTF8StringEncoding];
+        NSString *value = [NSString stringWithCString:entry->value encoding:NSUTF8StringEncoding];
+        if (key != nil && value != nil) md[key] = value;
+        entry = av_dict_get(metadata, "", entry, AV_DICT_IGNORE_SUFFIX);
+    }
+    
+    return md;
+}
+
+- (NSDictionary *)getMetadata
+{
+    if (!m_pFormatContext || !m_pFormatContext->metadata)
+        return nil;
+    
+    NSMutableDictionary *md = [NSMutableDictionary dictionary];
+    AVDictionary *metadata = m_pFormatContext->metadata;
+    AVDictionaryEntry *entry = av_dict_get(metadata, "", NULL, AV_DICT_IGNORE_SUFFIX);
+    while (entry) {
+        NSString *key = [[NSString stringWithCString:entry->key encoding:NSUTF8StringEncoding] lowercaseString];
         NSString *value = [NSString stringWithCString:entry->value encoding:NSUTF8StringEncoding];
         if (key != nil && value != nil) md[key] = value;
         entry = av_dict_get(metadata, "", entry, AV_DICT_IGNORE_SUFFIX);
@@ -357,7 +383,7 @@ static int interruptCallback(void *context) {
 }
 
 #pragma mark - Handle Frames
-- (NSArray *)readFrames {
+- (NSArray *)readFrames:(NSError **)error {
     if ((m_nVideoStream < 0 && m_nAudioStream < 0) || _isEOF) return nil;
     
     AVFormatContext *fmtctx = m_pFormatContext;
@@ -385,7 +411,19 @@ static int interruptCallback(void *context) {
             if (ret == AVERROR_EOF) self.isEOF = YES;
             char *e = av_err2str(ret);
             NSLog(@"read frame error: %s", e);
-            break;
+            
+            if (self.isEOF)
+                break;
+            else {
+                NSString *errorString = [NSString stringWithFormat:@"%s", e];
+                NSError *rawError = [NSError errorWithDomain:NSOSStatusErrorDomain code:0 userInfo:nil];
+                [DLGPlayerUtils createError:error
+                                 withDomain:DLGPlayerErrorDomainDecoder
+                                    andCode:DLGPlayerErrorCodeReadFrameError
+                                 andMessage:errorString
+                                andRawError:rawError];
+                return nil; //!!!
+            }
         }
         
         /*
@@ -503,8 +541,8 @@ static int interruptCallback(void *context) {
         
         f.width = width;
         f.height = height;
-        f.position = frame->best_effort_timestamp * _videoTimebase;
-        double duration = frame->pkt_duration;
+        f.position = av_frame_get_best_effort_timestamp(frame) * _videoTimebase;
+        double duration = av_frame_get_pkt_duration(frame);
         if (duration > 0) {
             f.duration = duration * _videoTimebase;
             f.duration += frame->repeat_pict * _videoTimebase * 0.5;
@@ -577,8 +615,8 @@ static int interruptCallback(void *context) {
         
         DLGPlayerAudioFrame *f = [[DLGPlayerAudioFrame alloc] init];
         f.data = mdata;
-        f.position = frame->best_effort_timestamp * _audioTimebase;
-        f.duration = frame->pkt_duration * _audioTimebase;
+        f.position = av_frame_get_best_effort_timestamp(frame) * _audioTimebase;
+        f.duration = av_frame_get_pkt_duration(frame) * _audioTimebase;
         
         if (f.duration == 0)
             f.duration = f.data.length / (sizeof(float) * channels * sampleRate);
@@ -592,6 +630,7 @@ static int interruptCallback(void *context) {
 #pragma mark - Seek
 - (void)seek:(double)position {
     _isEOF = NO;
+    g_dIOStartTime = [NSDate timeIntervalSinceReferenceDate]; //!!!
     if (_hasVideo) {
         NSTimeInterval start = [NSDate timeIntervalSinceReferenceDate];
         int64_t ts = (int64_t)(position / _videoTimebase);
@@ -658,15 +697,6 @@ static int interruptCallback(void *context) {
     
     if (fps != NULL) *fps = f;
     if (timebase != NULL) *timebase = t;
-}
-
-+ (double)rotationFromVideoStream:(AVStream *)stream {
-    double rotation = 0;
-    AVDictionaryEntry *entry = av_dict_get(stream->metadata, "rotate", NULL, AV_DICT_MATCH_CASE);
-    if (entry && entry->value) { rotation = av_strtod(entry->value, NULL); }
-    uint8_t *display_matrix = av_stream_get_side_data(stream, AV_PKT_DATA_DISPLAYMATRIX, NULL);
-    if (display_matrix) { rotation = -av_display_rotation_get((int32_t *)display_matrix); }
-    return rotation;
 }
 
 @end

@@ -23,10 +23,15 @@ typedef void (^onPauseComplete)(void);
 @property (nonatomic) BOOL playing;
 @property (nonatomic) BOOL buffering;
 @property (nonatomic, strong) NSDictionary *metadata;
+@property (nonatomic) BOOL hasVideo;
+@property (nonatomic) BOOL hasAudio;
+@property (nonatomic) BOOL hasPicture;
 
 - (void)open:(NSString *)url;
 - (void)close;
 - (void)play;
 - (void)pause;
+- (NSDictionary *)findMetadata; //!!!
+- (bool)seeking;
 
 @end

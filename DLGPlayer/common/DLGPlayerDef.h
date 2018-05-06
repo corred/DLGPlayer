@@ -21,7 +21,6 @@
 #define DLGPlayerErrorCodeCannotOpenInput                   -2
 #define DLGPlayerErrorCodeCannotFindStreamInfo              -3
 #define DLGPlayerErrorCodeNoVideoAndAudioStream             -4
-
 #define DLGPlayerErrorCodeNoAudioOuput                      -5
 #define DLGPlayerErrorCodeNoAudioChannel                    -6
 #define DLGPlayerErrorCodeNoAudioSampleRate                 -7
@@ -37,6 +36,7 @@
 #define DLGPlayerErrorCodeCannotDeactivateAudio             -17
 #define DLGPlayerErrorCodeCannotStartAudioUnit              -18
 #define DLGPlayerErrorCodeCannotStopAudioUnit               -19
+#define DLGPlayerErrorCodeReadFrameError                    -20
 
 #pragma mark - Notification
 #define DLGPlayerNotificationOpened                 @"DLGPlayerNotificationOpened"
