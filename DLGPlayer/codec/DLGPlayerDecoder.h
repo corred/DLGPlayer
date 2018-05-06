@@ -16,7 +16,6 @@
 @property (nonatomic) BOOL hasPicture;
 @property (nonatomic) BOOL isEOF;
 
-@property (nonatomic) double rotation;
 @property (nonatomic) double duration;
 @property (nonatomic, strong) NSDictionary *metadata;
 
@@ -30,10 +29,11 @@
 - (BOOL)open:(NSString *)url error:(NSError **)error;
 - (void)close;
 - (void)prepareClose;
-- (NSArray *)readFrames;
+- (NSArray *)readFrames:(NSError **)error;
 - (void)seek:(double)position;
 - (int)videoWidth;
 - (int)videoHeight;
 - (BOOL)isYUV;
+- (NSDictionary *)getMetadata;
 
 @end

@@ -5,5 +5,5 @@ varying vec2 v_texcoord;
 
 void main() {
     gl_Position = projection * position;
-    v_texcoord = texcoord;
+    v_texcoord = texcoord.xy;
 }

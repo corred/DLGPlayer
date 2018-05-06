@@ -138,7 +138,6 @@
         dispatch_async(dispatch_get_main_queue(), ^{
             strongSelf.view.isYUV = [strongSelf.decoder isYUV];
             strongSelf.view.keepLastFrame = [strongSelf.decoder hasPicture] && ![strongSelf.decoder hasVideo];
-            strongSelf.view.rotation = strongSelf.decoder.rotation;
             strongSelf.view.contentSize = CGSizeMake([strongSelf.decoder videoWidth], [strongSelf.decoder videoHeight]);
             strongSelf.view.contentMode = UIViewContentModeScaleAspectFit;
             
@@ -150,7 +149,10 @@
             strongSelf.bufferedDuration = 0;
             strongSelf.mediaPosition = 0;
             strongSelf.mediaSyncTime = 0;
-
+            strongSelf.hasVideo = strongSelf.decoder.hasVideo;
+            strongSelf.hasAudio = strongSelf.decoder.hasAudio;
+            strongSelf.hasPicture = strongSelf.decoder.hasPicture;
+            
             __weak typeof(strongSelf)ws = strongSelf;
             strongSelf.audio.frameReaderBlock = ^(float *data, UInt32 frames, UInt32 channels) {
                 [ws readAudioFrame:data frames:frames channels:channels];
@@ -160,6 +162,11 @@
             [[NSNotificationCenter defaultCenter] postNotificationName:DLGPlayerNotificationOpened object:strongSelf];
         });
     });
+}
+
+- (NSDictionary *)findMetadata
+{
+    return self.decoder.getMetadata;
 }
 
 - (void)close {
@@ -258,11 +265,13 @@
     NSMutableArray *tempAFrames = [NSMutableArray arrayWithCapacity:8];
     double tempDuration = 0;
     dispatch_time_t t = dispatch_time(DISPATCH_TIME_NOW, 0.02 * NSEC_PER_SEC);
+    NSError *error = nil;
     
     while (self.playing && !self.decoder.isEOF && !self.requestSeek
            && (self.bufferedDuration + tempDuration) < self.maxBufferDuration) {
         @autoreleasepool {
-            NSArray *fs = [self.decoder readFrames];
+            error = nil;
+            NSArray *fs = [self.decoder readFrames:&error];  //!!!
             if (fs == nil) { break; }
             if (fs.count == 0) { continue; }
             
@@ -285,13 +294,19 @@
                     dispatch_semaphore_signal(self.vFramesLock);
                 }
             }
-            {
+            {   DLGPlayerFrame *prevFrame = nil;
                 for (DLGPlayerFrame *f in fs) {
                     if (f.type == kDLGPlayerFrameTypeAudio) {
+                        if (prevFrame && (f.position < 0)) {
+                            f.position = prevFrame.position +  prevFrame.duration;  //fix from [ape @ 0x7fe0f7058400] files or others, who use many frames
+                        }
+                        
                         [tempAFrames addObject:f];
+                        prevFrame = f;
                         if (!self.decoder.hasVideo) tempDuration += f.duration;
                     }
                 }
+                prevFrame = nil;
                 
                 long timeout = dispatch_semaphore_wait(self.aFramesLock, t);
                 if (timeout == 0) {
@@ -337,6 +352,11 @@
         }
     }
     
+    if (error) {
+        //self.playing = NO;
+        [self close];
+        [self handleError:error];
+    }
     self.buffering = NO;
 }
 
@@ -378,11 +398,13 @@
         self.notifiedBufferStart = YES;
         NSDictionary *userInfo = @{ DLGPlayerNotificationBufferStateKey : @(self.notifiedBufferStart) };
         [[NSNotificationCenter defaultCenter] postNotificationName:DLGPlayerNotificationBufferStateChanged object:self userInfo:userInfo];
-    } else if (!noframes && self.notifiedBufferStart && self.bufferedDuration >= self.minBufferDuration) {
-        self.notifiedBufferStart = NO;
-        NSDictionary *userInfo = @{ DLGPlayerNotificationBufferStateKey : @(self.notifiedBufferStart) };
-        [[NSNotificationCenter defaultCenter] postNotificationName:DLGPlayerNotificationBufferStateChanged object:self userInfo:userInfo];
     }
+    else
+        if (!noframes && self.notifiedBufferStart && (self.bufferedDuration >= self.minBufferDuration || eof)) { //!!!
+            self.notifiedBufferStart = NO;
+            NSDictionary *userInfo = @{ DLGPlayerNotificationBufferStateKey : @(self.notifiedBufferStart) };
+            [[NSNotificationCenter defaultCenter] postNotificationName:DLGPlayerNotificationBufferStateChanged object:self userInfo:userInfo];
+        }
     
     // Render if has picture
     if (self.decoder.hasPicture && self.vframes.count > 0) {
@@ -528,6 +550,11 @@
 
 - (double)position {
     return self.mediaPosition;
+}
+
+- (bool)seeking
+{
+    return self.requestSeek;
 }
 
 #pragma mark - Handle Error

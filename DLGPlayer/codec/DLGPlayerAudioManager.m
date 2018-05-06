@@ -29,7 +29,7 @@ static OSStatus audioUnitRenderCallback(void *inRefCon,
     BOOL _registeredKVO;
     BOOL _opened;
     BOOL _closing;
-    BOOL _shouldPlayAfterInterruption;
+    //BOOL _shouldPlayAfterInterruption;
     BOOL _playing;
     double _sampleRate;
     UInt32 _bitsPerChannel;
@@ -54,7 +54,7 @@ static OSStatus audioUnitRenderCallback(void *inRefCon,
     _registeredKVO = NO;
     _opened = NO;
     _closing = NO;
-    _shouldPlayAfterInterruption = NO;
+    //_shouldPlayAfterInterruption = NO;
     _playing = NO;
     _sampleRate = 0;
     _bitsPerChannel = 0;
@@ -429,14 +429,16 @@ static OSStatus audioUnitRenderCallback(void *inRefCon,
 - (void)notifyAudioSessionInterruptionNotification:(NSNotification *)notif {
     AVAudioSessionInterruptionType type = [notif.userInfo[AVAudioSessionInterruptionTypeKey] unsignedIntegerValue];
     if (type == AVAudioSessionInterruptionTypeBegan) {
-        _shouldPlayAfterInterruption = _playing;
+//        _shouldPlayAfterInterruption = _playing;
         [self pause];
-    } else if (type == AVAudioSessionInterruptionTypeEnded) {
-        if (_shouldPlayAfterInterruption) {
-            _shouldPlayAfterInterruption = NO;
-            [self play];
-        }
     }
+//
+//    else if (type == AVAudioSessionInterruptionTypeEnded) {
+//        if (_shouldPlayAfterInterruption) {
+//            _shouldPlayAfterInterruption = NO;
+//            [self play];
+//        }
+//    }
 }
 
 - (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary<NSKeyValueChangeKey,id> *)change context:(void *)context {
