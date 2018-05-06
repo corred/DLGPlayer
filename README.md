@@ -12,6 +12,6 @@ libz.tbd<br>
 
 
 Hide warnings:<br>
-Go to Build Settings, add in sections "Apple LLVM 9.0 - Warnings - All languages" Documentation Comments = No
+Go to Build Settings, add "Documentation Comments = No" in sections "Apple LLVM 9.0 - Warnings - All languages" 
 
 
