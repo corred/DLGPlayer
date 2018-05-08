@@ -214,25 +214,8 @@ static int interruptCallback(void *context) {
     
     int64_t duration = fmtctx->duration;
     self.duration = (duration == AV_NOPTS_VALUE ? -1 : ((double)duration / AV_TIME_BASE));
-    self.metadata = [self findMetadata:fmtctx];
     
     return YES;
-}
-
-- (NSDictionary *)findMetadata:(AVFormatContext *)fmtctx {
-    if (fmtctx == NULL || fmtctx->metadata == NULL) return nil;
-    
-    NSMutableDictionary *md = [NSMutableDictionary dictionary];
-    AVDictionary *metadata = fmtctx->metadata;
-    AVDictionaryEntry *entry = av_dict_get(metadata, "", NULL, AV_DICT_IGNORE_SUFFIX);
-    while (entry != NULL) {
-        NSString *key = [NSString stringWithCString:entry->key encoding:NSUTF8StringEncoding];
-        NSString *value = [NSString stringWithCString:entry->value encoding:NSUTF8StringEncoding];
-        if (key != nil && value != nil) md[key] = value;
-        entry = av_dict_get(metadata, "", entry, AV_DICT_IGNORE_SUFFIX);
-    }
-    
-    return md;
 }
 
 - (NSDictionary *)getMetadata

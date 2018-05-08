@@ -22,7 +22,6 @@ typedef void (^onPauseComplete)(void);
 @property (nonatomic) BOOL opened;
 @property (nonatomic) BOOL playing;
 @property (nonatomic) BOOL buffering;
-@property (nonatomic, strong) NSDictionary *metadata;
 @property (nonatomic) BOOL hasVideo;
 @property (nonatomic) BOOL hasAudio;
 @property (nonatomic) BOOL hasPicture;

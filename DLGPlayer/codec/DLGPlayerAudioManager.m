@@ -419,11 +419,11 @@ static OSStatus audioUnitRenderCallback(void *inRefCon,
 }
 
 - (void)notifyAudioSessionRouteChanged:(NSNotification *)notif {
-    if ([self close]) {
-        if ([self open:nil]) {
-            [self play];
-        }
-    }
+//    if ([self close]) {
+//        if ([self open:nil]) {
+//            [self play];
+//        }
+//    }
 }
 
 - (void)notifyAudioSessionInterruptionNotification:(NSNotification *)notif {

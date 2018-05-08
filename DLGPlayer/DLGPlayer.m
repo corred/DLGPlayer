@@ -142,7 +142,6 @@
             strongSelf.view.contentMode = UIViewContentModeScaleAspectFit;
             
             strongSelf.duration = strongSelf.decoder.duration;
-            strongSelf.metadata = strongSelf.decoder.metadata;
             strongSelf.opening = NO;
             strongSelf.buffering = NO;
             strongSelf.playing = NO;
