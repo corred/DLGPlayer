@@ -152,7 +152,7 @@ static int interruptCallback(void *context) {
     AVCodecContext *acodectx = NULL;
     SwrContext *aswrctx = NULL;
     int astream = [self findAudioStream:fmtctx context:&acodectx];
-    if (astream >= 0 && acodectx != NULL) {
+    if (astream >= 0 && acodectx != NULL && _audioChannels && _audioSampleRate) {//!!!
         aframe = av_frame_alloc();
         [DLGPlayerDecoder stream:fmtctx->streams[astream] fps:NULL timebase:&_audioTimebase default:0.025];
         
@@ -360,6 +360,9 @@ static int interruptCallback(void *context) {
 - (void)flush:(AVCodecContext *)codectx frame:(AVFrame *)frame {
     if (codectx == NULL) return;
     int ret = avcodec_send_packet(codectx, NULL);
+    if (!frame)
+        return;  //!!!
+    
     do {
         ret = avcodec_receive_frame(codectx, frame);
     } while (ret != AVERROR_EOF);
